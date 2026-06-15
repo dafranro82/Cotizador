@@ -10,8 +10,8 @@
     "build": "vite build && prisma generate",
     "start": "node server/index.js",
     "postinstall": "prisma generate",
-    "db:push": "prisma db push",
-    "db:seed": "node prisma/seed.js"
+    "db:push": "node scripts/with-database-url.js prisma db push",
+    "db:seed": "node scripts/with-database-url.js node prisma/seed.js"
   },
   "dependencies": {
     "@prisma/client": "^6.9.0",
