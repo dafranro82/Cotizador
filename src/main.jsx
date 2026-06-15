@@ -16,7 +16,8 @@ import {
   ShoppingCart,
   SlidersHorizontal,
   Trash2,
-  UserRound
+  UserRound,
+  X
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import './styles.css';
@@ -408,6 +409,8 @@ function AdminPanel({ admin, setAdmin, products, settings, reloadProducts, reloa
   const [drafts, setDrafts] = useState({});
   const [quotes, setQuotes] = useState([]);
   const [query, setQuery] = useState('');
+  const [filters, setFilters] = useState({ status: 'active', currency: 'all', sort: 'reference' });
+  const [productModalOpen, setProductModalOpen] = useState(false);
   const [trmDraft, setTrmDraft] = useState(settings.trm || 4000);
 
   useEffect(() => {
@@ -432,7 +435,8 @@ function AdminPanel({ admin, setAdmin, products, settings, reloadProducts, reloa
           {
             name: item.name,
             price: item.price,
-            currency: item.currency || 'COP'
+            currency: item.currency || 'COP',
+            active: item.active
           }
         ])
       )
@@ -481,11 +485,22 @@ function AdminPanel({ admin, setAdmin, products, settings, reloadProducts, reloa
     const data = await res.json();
     if (!res.ok) return alert(data.message || 'No se pudo guardar');
     setProduct({ reference: '', name: '', description: '', price: '', currency: 'COP', imageUrl: '', unit: 'UND' });
+    setProductModalOpen(false);
     reloadProducts();
   }
 
-  async function disableProduct(id) {
-    await fetch(`/api/products/${id}`, { method: 'DELETE', credentials: 'include' });
+  async function setProductActive(item, active) {
+    const res = await fetch(`/api/products/${item.id}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...item,
+        active
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) return alert(data.message || 'No se pudo actualizar');
     reloadProducts();
   }
 
@@ -499,7 +514,8 @@ function AdminPanel({ admin, setAdmin, products, settings, reloadProducts, reloa
         ...item,
         name: draft.name,
         price: draft.price,
-        currency: draft.currency
+        currency: draft.currency,
+        active: draft.active
       })
     });
     const data = await res.json();
@@ -507,9 +523,22 @@ function AdminPanel({ admin, setAdmin, products, settings, reloadProducts, reloa
     reloadProducts();
   }
 
-  const filteredProducts = products.filter((item) =>
-    `${item.reference} ${item.name} ${item.description}`.toLowerCase().includes(query.toLowerCase())
-  );
+  const filteredProducts = products
+    .filter((item) => {
+      const textMatches = `${item.reference} ${item.name} ${item.description}`.toLowerCase().includes(query.toLowerCase());
+      const statusMatches =
+        filters.status === 'all' || (filters.status === 'active' ? item.active : !item.active);
+      const currencyMatches = filters.currency === 'all' || (item.currency || 'COP') === filters.currency;
+      return textMatches && statusMatches && currencyMatches;
+    })
+    .sort((a, b) => {
+      if (filters.sort === 'price_desc') return Number(b.price) - Number(a.price);
+      if (filters.sort === 'price_asc') return Number(a.price) - Number(b.price);
+      if (filters.sort === 'name') return a.name.localeCompare(b.name);
+      return a.reference.localeCompare(b.reference);
+    });
+
+  const visibleAdminProducts = filteredProducts.slice(0, 96);
 
   if (!admin) {
     return (
@@ -537,11 +566,49 @@ function AdminPanel({ admin, setAdmin, products, settings, reloadProducts, reloa
           <p className="eyebrow">Panel seguro</p>
           <h1>Productos y cotizaciones</h1>
         </div>
-        <button className="ghost" onClick={signOut}>
-          <LogOut size={18} />
-          Salir
-        </button>
+        <div className="admin-actions">
+          <button type="button" className="primary-action" onClick={() => setProductModalOpen(true)}>
+            <PackagePlus size={18} />
+            Nuevo producto
+          </button>
+          <button type="button" className="ghost" onClick={signOut}>
+            <LogOut size={18} />
+            Salir
+          </button>
+        </div>
       </header>
+
+      {productModalOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <form className="product-modal" onSubmit={saveProduct}>
+            <div className="modal-head">
+              <div>
+                <p className="eyebrow">Catalogo</p>
+                <h2>Nuevo producto</h2>
+              </div>
+              <button type="button" className="icon-button" onClick={() => setProductModalOpen(false)} aria-label="Cerrar">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="form-grid">
+              <Input label="Referencia" value={product.reference} onChange={(v) => setProduct((x) => ({ ...x, reference: v }))} required />
+              <Input label="Nombre" value={product.name} onChange={(v) => setProduct((x) => ({ ...x, name: v }))} required />
+              <Input label="Precio" type="number" value={product.price} onChange={(v) => setProduct((x) => ({ ...x, price: v }))} required />
+              <SelectInput label="Moneda" value={product.currency} onChange={(v) => setProduct((x) => ({ ...x, currency: v }))} />
+              <Input label="Unidad" value={product.unit} onChange={(v) => setProduct((x) => ({ ...x, unit: v }))} />
+              <Input label="Imagen URL" value={product.imageUrl} onChange={(v) => setProduct((x) => ({ ...x, imageUrl: v }))} />
+            </div>
+            <label>
+              <span>Descripcion</span>
+              <textarea value={product.description} onChange={(e) => setProduct((x) => ({ ...x, description: e.target.value }))} required />
+            </label>
+            <button className="primary-action">
+              <PackagePlus size={18} />
+              Crear producto
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="admin-stats">
         <form className="stat-card trm-card" onSubmit={saveTrm}>
@@ -570,74 +637,75 @@ function AdminPanel({ admin, setAdmin, products, settings, reloadProducts, reloa
         </div>
       </div>
 
-      <div className="admin-grid">
-        <form className="product-form" onSubmit={saveProduct}>
-          <h2>Nuevo producto</h2>
-          <Input label="Referencia" value={product.reference} onChange={(v) => setProduct((x) => ({ ...x, reference: v }))} required />
-          <Input label="Nombre" value={product.name} onChange={(v) => setProduct((x) => ({ ...x, name: v }))} required />
-          <div className="inline-fields">
-            <Input label="Precio" type="number" value={product.price} onChange={(v) => setProduct((x) => ({ ...x, price: v }))} required />
-            <SelectInput label="Moneda" value={product.currency} onChange={(v) => setProduct((x) => ({ ...x, currency: v }))} />
+      <section className="admin-table">
+        <div className="table-head">
+          <div>
+            <p className="eyebrow">Base de productos</p>
+            <h2>{filteredProducts.length.toLocaleString('es-CO')} productos</h2>
           </div>
-          <Input label="Unidad" value={product.unit} onChange={(v) => setProduct((x) => ({ ...x, unit: v }))} />
-          <Input label="Imagen URL" value={product.imageUrl} onChange={(v) => setProduct((x) => ({ ...x, imageUrl: v }))} />
-          <label>
-            <span>Descripcion</span>
-            <textarea value={product.description} onChange={(e) => setProduct((x) => ({ ...x, description: e.target.value }))} required />
-          </label>
-          <button className="primary-action">
-            <PackagePlus size={18} />
-            Crear producto
-          </button>
-        </form>
-
-        <div className="admin-table">
-          <div className="table-head">
-            <h2>Base de productos</h2>
-            <div className="search-box compact">
-              <Search size={16} />
-              <input placeholder="Buscar" value={query} onChange={(event) => setQuery(event.target.value)} />
-            </div>
+          <div className="search-box compact">
+            <Search size={16} />
+            <input placeholder="Buscar referencia, nombre o descripcion" value={query} onChange={(event) => setQuery(event.target.value)} />
           </div>
-          {filteredProducts.slice(0, 120).map((item) => (
-            <div className={!item.active ? 'inactive table-row' : 'table-row'} key={item.id}>
-              <span>{item.reference}</span>
-              <input
-                aria-label={`Nombre ${item.reference}`}
-                value={drafts[item.id]?.name || ''}
-                onChange={(event) =>
-                  setDrafts((current) => ({ ...current, [item.id]: { ...current[item.id], name: event.target.value } }))
-                }
-              />
-              <input
-                aria-label={`Precio ${item.reference}`}
-                type="number"
-                value={drafts[item.id]?.price || ''}
-                onChange={(event) =>
-                  setDrafts((current) => ({ ...current, [item.id]: { ...current[item.id], price: event.target.value } }))
-                }
-              />
-              <select
-                aria-label={`Moneda ${item.reference}`}
-                value={drafts[item.id]?.currency || 'COP'}
-                onChange={(event) =>
-                  setDrafts((current) => ({ ...current, [item.id]: { ...current[item.id], currency: event.target.value } }))
-                }
-              >
-                <option value="COP">COP</option>
-                <option value="USD">USD</option>
-              </select>
-              <button title="Guardar cambios" onClick={() => updateProduct(item)}>
-                <Save size={16} />
-              </button>
-              <button title="Desactivar" onClick={() => disableProduct(item.id)}>
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
-          {filteredProducts.length > 120 && <p className="list-note">Mostrando 120 de {filteredProducts.length}. Usa la busqueda para editar mas rapido.</p>}
         </div>
-      </div>
+
+        <div className="admin-filters">
+          <div className="filter-group">
+            {[
+              ['active', 'Activos'],
+              ['all', 'Todos'],
+              ['inactive', 'Inactivos']
+            ].map(([value, label]) => (
+              <button
+                type="button"
+                className={filters.status === value ? 'selected' : ''}
+                key={value}
+                onClick={() => setFilters((current) => ({ ...current, status: value }))}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="filter-group">
+            {[
+              ['all', 'Todas'],
+              ['COP', 'COP'],
+              ['USD', 'USD']
+            ].map(([value, label]) => (
+              <button
+                type="button"
+                className={filters.currency === value ? 'selected' : ''}
+                key={value}
+                onClick={() => setFilters((current) => ({ ...current, currency: value }))}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <select value={filters.sort} onChange={(event) => setFilters((current) => ({ ...current, sort: event.target.value }))}>
+            <option value="reference">Referencia</option>
+            <option value="name">Nombre</option>
+            <option value="price_asc">Precio menor</option>
+            <option value="price_desc">Precio mayor</option>
+          </select>
+        </div>
+
+        <div className="admin-product-grid">
+          {visibleAdminProducts.map((item) => (
+            <AdminProductCard
+              key={item.id}
+              item={item}
+              draft={drafts[item.id] || item}
+              setDrafts={setDrafts}
+              onSave={updateProduct}
+              onSetActive={setProductActive}
+            />
+          ))}
+        </div>
+        {filteredProducts.length > visibleAdminProducts.length && (
+          <p className="list-note">Mostrando {visibleAdminProducts.length} de {filteredProducts.length}. Usa busqueda y filtros para acotar.</p>
+        )}
+      </section>
 
       <div className="quotes-list">
         <h2>Cotizaciones recibidas</h2>
@@ -653,6 +721,75 @@ function AdminPanel({ admin, setAdmin, products, settings, reloadProducts, reloa
         ))}
       </div>
     </section>
+  );
+}
+
+function AdminProductCard({ item, draft, setDrafts, onSave, onSetActive }) {
+  const active = Boolean(draft.active ?? item.active);
+
+  function updateDraft(field, value) {
+    setDrafts((current) => ({
+      ...current,
+      [item.id]: {
+        ...current[item.id],
+        [field]: value
+      }
+    }));
+  }
+
+  return (
+    <article className={item.active ? 'admin-product-card' : 'admin-product-card inactive'}>
+      <div className="admin-product-media">
+        <img src={item.imageUrl || '/placeholder-product.svg'} alt="" loading="lazy" />
+      </div>
+      <div className="admin-product-content">
+        <div className="admin-product-top">
+          <span className="ref-badge">{item.reference}</span>
+          <span className={active ? 'state-badge active' : 'state-badge inactive'}>
+            {active ? 'Activo' : 'Inactivo'}
+          </span>
+        </div>
+
+        <label>
+          <span>Nombre</span>
+          <input value={draft.name || ''} onChange={(event) => updateDraft('name', event.target.value)} />
+        </label>
+
+        <div className="admin-card-fields">
+          <label>
+            <span>Precio</span>
+            <input type="number" min="0" value={draft.price || ''} onChange={(event) => updateDraft('price', event.target.value)} />
+          </label>
+          <label>
+            <span>Moneda</span>
+            <select value={draft.currency || 'COP'} onChange={(event) => updateDraft('currency', event.target.value)}>
+              <option value="COP">COP</option>
+              <option value="USD">USD</option>
+            </select>
+          </label>
+          <label>
+            <span>Estado</span>
+            <select value={active ? 'active' : 'inactive'} onChange={(event) => updateDraft('active', event.target.value === 'active')}>
+              <option value="active">Activo</option>
+              <option value="inactive">Inactivo</option>
+            </select>
+          </label>
+        </div>
+
+        <p>{item.description}</p>
+
+        <div className="admin-card-actions">
+          <button type="button" className="primary-action" onClick={() => onSave(item)}>
+            <Save size={16} />
+            Guardar
+          </button>
+          <button type="button" className={item.active ? 'danger-action' : 'success-action'} onClick={() => onSetActive(item, !item.active)}>
+            {item.active ? <Trash2 size={16} /> : <Check size={16} />}
+            {item.active ? 'Desactivar' : 'Activar'}
+          </button>
+        </div>
+      </div>
+    </article>
   );
 }
 
