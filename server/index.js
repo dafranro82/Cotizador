@@ -13,6 +13,7 @@ const app = express();
 const prisma = new PrismaClient();
 const port = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
+const DEFAULT_TRM = 4000;
 
 const requiredEnv = ['DATABASE_URL', 'JWT_SECRET'];
 for (const key of requiredEnv) {
@@ -35,7 +36,8 @@ const cookieOptions = {
 function normalizeProduct(product) {
   return {
     ...product,
-    price: Number(product.price)
+    price: Number(product.price),
+    currency: product.currency || 'COP'
   };
 }
 
@@ -45,12 +47,33 @@ function normalizeQuote(quote) {
     subtotal: Number(quote.subtotal),
     tax: Number(quote.tax),
     total: Number(quote.total),
+    trm: Number(quote.trm),
+    currency: quote.currency || 'COP',
     items: quote.items?.map((item) => ({
       ...item,
       unitPrice: Number(item.unitPrice),
       lineTotal: Number(item.lineTotal)
     }))
   };
+}
+
+async function getTrm() {
+  const setting = await prisma.appSetting.findUnique({ where: { key: 'TRM' } });
+  const trm = Number(setting?.value);
+  return Number.isFinite(trm) && trm > 0 ? trm : DEFAULT_TRM;
+}
+
+function convertPrice(price, fromCurrency, toCurrency, trm) {
+  const amount = Number(price);
+  const source = fromCurrency === 'USD' ? 'USD' : 'COP';
+  const target = toCurrency === 'USD' ? 'USD' : 'COP';
+  if (source === target) return amount;
+  if (source === 'USD' && target === 'COP') return amount * trm;
+  return amount / trm;
+}
+
+function roundMoney(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
 function getToken(req) {
@@ -72,6 +95,24 @@ function requireAdmin(req, res, next) {
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'komodo-cotizador' });
+});
+
+app.get('/api/settings', async (_req, res) => {
+  const trm = await getTrm();
+  res.json({ trm, defaultCurrency: 'COP' });
+});
+
+app.put('/api/settings/trm', requireAdmin, async (req, res) => {
+  const trm = Number(req.body.trm);
+  if (!Number.isFinite(trm) || trm <= 0) {
+    return res.status(400).json({ message: 'TRM invalida' });
+  }
+  const setting = await prisma.appSetting.upsert({
+    where: { key: 'TRM' },
+    update: { value: String(roundMoney(trm)) },
+    create: { key: 'TRM', value: String(roundMoney(trm)) }
+  });
+  res.json({ trm: Number(setting.value) });
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -146,6 +187,7 @@ function productPayload(body) {
     name: String(body.name).trim(),
     description: String(body.description).trim(),
     price,
+    currency: body.currency === 'USD' ? 'USD' : 'COP',
     imageUrl: body.imageUrl ? String(body.imageUrl).trim() : null,
     unit: body.unit ? String(body.unit).trim() : 'und',
     active: Boolean(body.active ?? true)
@@ -154,6 +196,8 @@ function productPayload(body) {
 
 app.post('/api/quotes', async (req, res) => {
   const { customer, items } = req.body;
+  const quoteCurrency = req.body.currency === 'USD' ? 'USD' : 'COP';
+  const trm = await getTrm();
   if (!customer?.projectName || !customer?.clientCompany || !customer?.contactName || !customer?.email) {
     return res.status(400).json({ message: 'Faltan datos del cliente' });
   }
@@ -171,7 +215,7 @@ app.post('/api/quotes', async (req, res) => {
     const product = byId.get(item.productId);
     const quantity = Math.max(1, Number.parseInt(item.quantity, 10) || 1);
     if (!product) throw Object.assign(new Error('Producto no disponible'), { status: 400 });
-    const unitPrice = Number(product.price);
+    const unitPrice = roundMoney(convertPrice(product.price, product.currency, quoteCurrency, trm));
     return {
       productId: product.id,
       reference: product.reference,
@@ -179,11 +223,11 @@ app.post('/api/quotes', async (req, res) => {
       description: product.description,
       quantity,
       unitPrice,
-      lineTotal: unitPrice * quantity
+      lineTotal: roundMoney(unitPrice * quantity)
     };
   });
 
-  const subtotal = quoteItems.reduce((sum, item) => sum + item.lineTotal, 0);
+  const subtotal = roundMoney(quoteItems.reduce((sum, item) => sum + item.lineTotal, 0));
   const tax = 0;
   const total = subtotal + tax;
 
@@ -200,6 +244,8 @@ app.post('/api/quotes', async (req, res) => {
       subtotal,
       tax,
       total,
+      currency: quoteCurrency,
+      trm,
       items: { create: quoteItems }
     },
     include: { items: true }

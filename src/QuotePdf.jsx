@@ -2,11 +2,13 @@ import React from 'react';
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import { Download } from 'lucide-react';
 
-const currency = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0
-});
+function formatMoney(value, currencyCode = 'COP') {
+  return new Intl.NumberFormat(currencyCode === 'USD' ? 'en-US' : 'es-CO', {
+    style: 'currency',
+    currency: currencyCode,
+    maximumFractionDigits: currencyCode === 'USD' ? 2 : 0
+  }).format(Number(value) || 0);
+}
 
 export default function PdfDownload({ quote, customer }) {
   return (
@@ -27,6 +29,7 @@ export default function PdfDownload({ quote, customer }) {
 
 function QuotePdf({ quote, customer }) {
   const today = new Date(quote.createdAt).toLocaleDateString('es-CO');
+  const quoteCurrency = quote.currency || 'COP';
   return (
     <Document>
       <Page size="A4" style={pdfStyles.page}>
@@ -44,6 +47,8 @@ function QuotePdf({ quote, customer }) {
             <Text>Fecha {today}</Text>
             <Text>Contacto: {customer.contactName}</Text>
             <Text>{customer.email}</Text>
+            <Text>Moneda: {quoteCurrency}</Text>
+            <Text>TRM: {formatMoney(quote.trm, 'COP')}</Text>
           </View>
         </View>
 
@@ -68,13 +73,13 @@ function QuotePdf({ quote, customer }) {
             <Text style={pdfStyles.ref}>{item.reference}</Text>
             <Text style={pdfStyles.desc}>{item.description}</Text>
             <Text style={pdfStyles.qty}>{item.quantity}</Text>
-            <Text style={pdfStyles.money}>{currency.format(item.unitPrice)}</Text>
-            <Text style={pdfStyles.money}>{currency.format(item.lineTotal)}</Text>
+            <Text style={pdfStyles.money}>{formatMoney(item.unitPrice, quoteCurrency)}</Text>
+            <Text style={pdfStyles.money}>{formatMoney(item.lineTotal, quoteCurrency)}</Text>
           </View>
         ))}
         <View style={pdfStyles.totalBox}>
-          <Text>Subtotal {currency.format(quote.subtotal)}</Text>
-          <Text style={pdfStyles.total}>Total {currency.format(quote.total)}</Text>
+          <Text>Subtotal {formatMoney(quote.subtotal, quoteCurrency)}</Text>
+          <Text style={pdfStyles.total}>Total {formatMoney(quote.total, quoteCurrency)}</Text>
         </View>
       </Page>
     </Document>

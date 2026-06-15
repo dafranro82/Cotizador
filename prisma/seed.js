@@ -13,6 +13,12 @@ const products = JSON.parse(await fs.readFile(productsPath, 'utf8'));
 const batchSize = 100;
 let imported = 0;
 
+await prisma.appSetting.upsert({
+  where: { key: 'TRM' },
+  update: {},
+  create: { key: 'TRM', value: '4000' }
+});
+
 for (let i = 0; i < products.length; i += batchSize) {
   const batch = products.slice(i, i + batchSize);
   await prisma.$transaction(
@@ -23,6 +29,7 @@ for (let i = 0; i < products.length; i += batchSize) {
           name: product.name,
           description: product.description,
           price: product.price,
+          currency: product.currency || 'COP',
           imageUrl: product.imageUrl,
           unit: product.unit,
           active: product.active
@@ -32,6 +39,7 @@ for (let i = 0; i < products.length; i += batchSize) {
           name: product.name,
           description: product.description,
           price: product.price,
+          currency: product.currency || 'COP',
           imageUrl: product.imageUrl,
           unit: product.unit,
           active: product.active
