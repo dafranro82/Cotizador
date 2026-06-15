@@ -69,11 +69,4 @@ Railway ejecuta `npm run db:push && npm start` al iniciar, por lo que crea o act
 - En `Admin`, ingresa con `ADMIN_EMAIL` y `ADMIN_PASSWORD`.
 - El admin puede modificar la TRM, crear productos, editar nombre/precio/moneda, desactivar productos y ver cotizaciones recibidas.
 
-Credenciales por defecto si no defines variables:
-
-```txt
-Correo: admin@komodo.com
-Clave: admin12345
-```
-
 En produccion cambia `ADMIN_EMAIL`, `ADMIN_PASSWORD` y `JWT_SECRET` en Railway.
