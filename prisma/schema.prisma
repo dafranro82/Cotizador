@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  reference   String      @unique
+  name        String
+  description String
+  price       Decimal     @db.Decimal(12, 2)
+  imageUrl    String?
+  unit        String      @default("und")
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  quoteItems  QuoteItem[]
+}
+
+model Quote {
+  id              String      @id @default(cuid())
+  number          Int         @unique @default(autoincrement())
+  projectName     String
+  clientCompany   String
+  contactName     String
+  address         String
+  phone           String?
+  mobile          String?
+  email           String
+  costCenter      String?
+  subtotal        Decimal     @db.Decimal(12, 2)
+  tax             Decimal     @db.Decimal(12, 2)
+  total           Decimal     @db.Decimal(12, 2)
+  status          String      @default("enviada")
+  createdAt       DateTime    @default(now())
+  items           QuoteItem[]
+}
+
+model QuoteItem {
+  id          String   @id @default(cuid())
+  quoteId     String
+  productId   String
+  reference   String
+  name        String
+  description String
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  lineTotal   Decimal  @db.Decimal(12, 2)
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id])
+}

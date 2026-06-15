@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" role="img" aria-label="Producto Komodo">
+  <rect width="240" height="240" fill="#eef2ea"/>
+  <circle cx="120" cy="120" r="54" fill="#c4cb23"/>
+  <path d="M91 120l31-34h28l-31 34 31 34h-28z" fill="#fff"/>
+  <path d="M120 120l31-34h28l-31 34 31 34h-28z" fill="#172030" opacity=".45"/>
+</svg>
