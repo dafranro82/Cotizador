@@ -58,13 +58,26 @@ function normalizeReference(value) {
   return String(value || '').trim().toUpperCase();
 }
 
+function usableImageUrl(value) {
+  const imageUrl = String(value || '').trim();
+  if (!imageUrl) return null;
+  if (imageUrl.startsWith('/')) return imageUrl;
+
+  try {
+    const url = new URL(imageUrl);
+    return /\.(avif|gif|jpe?g|png|svg|webp)$/i.test(url.pathname) ? imageUrl : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeProduct(product) {
   const reference = normalizeReference(product.reference);
   return {
     ...product,
     price: Number(product.price),
     currency: product.currency || 'COP',
-    imageUrl: productImages[reference] || product.imageUrl
+    imageUrl: productImages[reference] || usableImageUrl(product.imageUrl)
   };
 }
 
