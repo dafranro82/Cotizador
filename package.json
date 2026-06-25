@@ -11,7 +11,8 @@
     "start": "node server/index.js",
     "postinstall": "prisma generate",
     "db:push": "node scripts/with-database-url.js prisma db push",
-    "db:seed": "node scripts/with-database-url.js node prisma/seed.js"
+    "db:seed": "node scripts/with-database-url.js node prisma/seed.js",
+    "images:import": "node scripts/import-product-images.js"
   },
   "dependencies": {
     "@prisma/client": "^6.9.0",
@@ -32,6 +33,8 @@
   "devDependencies": {
     "concurrently": "^9.1.2",
     "nodemon": "^3.1.10",
-    "vite": "^6.3.5"
+    "sharp": "^0.35.2",
+    "vite": "^6.3.5",
+    "yauzl": "^3.4.0"
   }
 }

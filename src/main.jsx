@@ -370,7 +370,7 @@ function ProductCard({ product, quantity, currencyCode, trm, onQuantity }) {
   const displayPrice = convertPrice(product, currencyCode, trm);
   return (
     <article className={quantity > 0 ? 'product-card selected' : 'product-card'}>
-      <img src={product.imageUrl || '/placeholder-product.svg'} alt="" />
+      <ProductImage src={product.imageUrl} alt={product.reference} />
       <div className="product-body">
         <div className="product-meta">
           <span>{product.reference}</span>
@@ -740,7 +740,7 @@ function AdminProductCard({ item, draft, setDrafts, onSave, onSetActive }) {
   return (
     <article className={item.active ? 'admin-product-card' : 'admin-product-card inactive'}>
       <div className="admin-product-media">
-        <img src={item.imageUrl || '/placeholder-product.svg'} alt="" loading="lazy" />
+        <ProductImage src={item.imageUrl} alt={item.reference} />
       </div>
       <div className="admin-product-content">
         <div className="admin-product-top">
@@ -791,6 +791,17 @@ function AdminProductCard({ item, draft, setDrafts, onSave, onSetActive }) {
       </div>
     </article>
   );
+}
+
+function ProductImage({ src, alt }) {
+  const [failed, setFailed] = useState(false);
+  const imageSrc = !failed && src ? src : '/placeholder-product.svg';
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  return <img src={imageSrc} alt={alt || ''} loading="lazy" onError={() => setFailed(true)} />;
 }
 
 function Input({ label, value, onChange, type = 'text', required = false }) {

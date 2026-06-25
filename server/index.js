@@ -4,6 +4,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PrismaClient } from '@prisma/client';
@@ -14,6 +15,7 @@ const prisma = new PrismaClient();
 const port = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
 const DEFAULT_TRM = 4000;
+const productImages = loadProductImages();
 
 const requiredEnv = ['DATABASE_URL', 'JWT_SECRET', 'ADMIN_EMAIL', 'ADMIN_PASSWORD'];
 for (const key of requiredEnv) {
@@ -33,11 +35,36 @@ const cookieOptions = {
   maxAge: 1000 * 60 * 60 * 8
 };
 
+function loadProductImages() {
+  const candidates = [
+    path.join(__dirname, '..', 'dist', 'product-images', 'manifest.json'),
+    path.join(__dirname, '..', 'public', 'product-images', 'manifest.json')
+  ];
+
+  for (const manifestPath of candidates) {
+    if (fs.existsSync(manifestPath)) {
+      try {
+        return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      } catch (error) {
+        console.warn(`[config] No se pudo leer ${manifestPath}: ${error.message}`);
+      }
+    }
+  }
+
+  return {};
+}
+
+function normalizeReference(value) {
+  return String(value || '').trim().toUpperCase();
+}
+
 function normalizeProduct(product) {
+  const reference = normalizeReference(product.reference);
   return {
     ...product,
     price: Number(product.price),
-    currency: product.currency || 'COP'
+    currency: product.currency || 'COP',
+    imageUrl: productImages[reference] || product.imageUrl
   };
 }
 

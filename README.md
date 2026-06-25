@@ -43,6 +43,16 @@ Cliente: `http://localhost:5173`
 
 Backend: `http://localhost:3000`
 
+## Imagenes de productos
+
+Las imagenes se importan desde un ZIP usando el nombre de la referencia como nombre de archivo. Por ejemplo, `_PL62.jpg` o `PL62.png` se asocia con la referencia `PL62`.
+
+```bash
+npm run images:import -- "C:\ruta\Base Imagenes.zip"
+```
+
+El importador genera miniaturas WebP en `public/product-images` y un `manifest.json`. El API usa ese manifest automaticamente para mostrar la imagen local de cada producto cuando existe.
+
 ## Despliegue en Railway
 
 1. Crea un proyecto en Railway.

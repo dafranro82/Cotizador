@@ -3,4 +3,5 @@ dist
 .env
 .env.local
 *.log
+product-image-failures.json
 .DS_Store
