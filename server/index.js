@@ -15,7 +15,7 @@ const port = process.env.PORT || 3000;
 const isProduction = process.env.NODE_ENV === 'production';
 const DEFAULT_TRM = 4000;
 
-const requiredEnv = ['DATABASE_URL', 'JWT_SECRET'];
+const requiredEnv = ['DATABASE_URL', 'JWT_SECRET', 'ADMIN_EMAIL', 'ADMIN_PASSWORD'];
 for (const key of requiredEnv) {
   if (!process.env[key]) {
     console.warn(`[config] Falta ${key}. Configuralo antes de desplegar.`);
@@ -84,9 +84,12 @@ function getToken(req) {
 
 function requireAdmin(req, res, next) {
   try {
+    if (!process.env.JWT_SECRET) {
+      return res.status(503).json({ message: 'Autenticacion no configurada' });
+    }
     const token = getToken(req);
     if (!token) return res.status(401).json({ message: 'Sesion requerida' });
-    req.admin = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
+    req.admin = jwt.verify(token, process.env.JWT_SECRET);
     return next();
   } catch {
     return res.status(401).json({ message: 'Sesion invalida' });
@@ -117,8 +120,14 @@ app.put('/api/settings/trm', requireAdmin, async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@komodo.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'admin12345';
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const jwtSecret = process.env.JWT_SECRET;
+
+  if (!adminEmail || !adminPassword || !jwtSecret) {
+    return res.status(503).json({ message: 'Credenciales de admin no configuradas' });
+  }
+
   const passwordMatches = adminPassword.startsWith('$2')
     ? await bcrypt.compare(password || '', adminPassword)
     : password === adminPassword;
@@ -127,7 +136,7 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(401).json({ message: 'Credenciales invalidas' });
   }
 
-  const token = jwt.sign({ email, role: 'admin' }, process.env.JWT_SECRET || 'dev-secret', {
+  const token = jwt.sign({ email, role: 'admin' }, jwtSecret, {
     expiresIn: '8h'
   });
   res.cookie('admin_token', token, cookieOptions);
